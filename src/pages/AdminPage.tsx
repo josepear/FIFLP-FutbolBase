@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { db, saveOffline } from '../lib/db';
-import type { Team, Category } from '../lib/types';
+import { TEST_DEFINITIONS, type Team, type Category, type TestType } from '../lib/types';
 import { generateId, sortByOrder } from '../lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { TestIcon } from '../components/TestIcon';
 import { Plus } from 'lucide-react';
 
 export function AdminPage() {
@@ -17,11 +18,17 @@ export function AdminPage() {
   const [teamColor, setTeamColor] = useState('#3b82f6');
   const [catName, setCatName] = useState('');
   const [catFormato, setCatFormato] = useState<'f8' | 'f11'>('f8');
+  const [objectives, setObjectives] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!profile?.club_id) return;
     db.teams.where('club_id').equals(profile.club_id).toArray().then(t => setTeams(sortByOrder(t)));
     db.categories.where('club_id').equals(profile.club_id).toArray().then(c => setCategories(sortByOrder(c)));
+    db.testTargets.where('club_id').equals(profile.club_id).toArray().then(ts => {
+      const m: Record<string, string> = {};
+      for (const t of ts) if (!t.team_id) m[t.test_type] = String(t.target_value);
+      setObjectives(m);
+    });
   }, [profile?.club_id]);
 
   async function addTeam() {
@@ -51,6 +58,29 @@ export function AdminPage() {
     });
     setCatName('');
     db.categories.where('club_id').equals(profile.club_id).toArray().then(c => setCategories(sortByOrder(c)));
+  }
+
+  async function saveObjectives() {
+    if (!profile?.club_id) return;
+    const clubId = profile.club_id;
+    const existing = await db.testTargets.where('club_id').equals(clubId).toArray();
+    for (const t of existing) {
+      if (t.team_id) continue;
+      await db.testTargets.delete(t.id);
+      await db.pendingSync.add({ id: generateId(), table: 'testTargets', action: 'delete', data: { id: t.id }, created_at: new Date().toISOString() });
+    }
+    for (const [testType, raw] of Object.entries(objectives)) {
+      if (raw === undefined || raw === '') continue;
+      const num = Number(raw);
+      if (Number.isNaN(num)) continue;
+      await saveOffline('testTargets', {
+        id: generateId(),
+        club_id: clubId,
+        test_type: testType as TestType,
+        target_value: num,
+        created_at: new Date().toISOString(),
+      });
+    }
   }
 
   return (
@@ -102,6 +132,35 @@ export function AdminPage() {
             <input type="color" value={teamColor} onChange={e => setTeamColor(e.target.value)} className="w-10 h-10 rounded-md border border-border bg-card" />
             <Button onClick={addTeam} size="sm"><Plus size={16} /> Añadir</Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="space-y-4 py-4">
+          <h2 className="font-semibold text-foreground">Objetivos (araña de rendimiento)</h2>
+          <p className="text-xs text-muted-foreground">Marca el objetivo de cada prueba para todo el club. El anillo exterior de la araña = objetivo.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {(Object.keys(TEST_DEFINITIONS) as TestType[]).map(t => {
+              const def = TEST_DEFINITIONS[t];
+              return (
+                <div key={t} className="flex items-center gap-2">
+                  <TestIcon type={t} size={18} />
+                  <span className="flex-1 text-sm text-foreground truncate">{def.name}</span>
+                  <Input
+                    type="number"
+                    step="any"
+                    inputMode="decimal"
+                    value={objectives[t] ?? ''}
+                    onChange={e => setObjectives(prev => ({ ...prev, [t]: e.target.value }))}
+                    placeholder="—"
+                    className="w-20"
+                  />
+                  <span className="text-xs text-muted-foreground w-10">{def.unit}</span>
+                </div>
+              );
+            })}
+          </div>
+          <Button onClick={saveObjectives} className="w-full">Guardar objetivos</Button>
         </CardContent>
       </Card>
     </div>

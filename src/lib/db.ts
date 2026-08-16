@@ -36,7 +36,7 @@ export class FutbolBaseDB extends Dexie {
 export const db = new FutbolBaseDB();
 
 export async function saveOffline<T extends { id: string }>(
-  table: keyof Pick<FutbolBaseDB, 'sessions' | 'sessionTests' | 'testResults' | 'players' | 'categories' | 'teams' | 'matches' | 'opponents' | 'videos'>,
+  table: keyof Pick<FutbolBaseDB, 'sessions' | 'sessionTests' | 'testResults' | 'players' | 'categories' | 'teams' | 'matches' | 'opponents' | 'videos' | 'testTargets'>,
   data: T
 ) {
   if (table === 'categories') {
@@ -57,6 +57,8 @@ export async function saveOffline<T extends { id: string }>(
     await db.opponents.put(data as unknown as OpponentTeam);
   } else if (table === 'videos') {
     await db.videos.put(data as unknown as Video);
+  } else if (table === 'testTargets') {
+    await db.testTargets.put(data as unknown as TestTarget);
   }
   await db.pendingSync.add({
     id: generateId(),
