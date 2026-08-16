@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { Home, Users, TrendingUp, CalendarDays, Settings, LogOut } from 'lucide-react';
+import { Home, PlayCircle, Users, TrendingUp, CalendarDays, Settings, LogOut } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
@@ -13,6 +13,7 @@ export function Layout({ children, currentTab, onTabChange }: Props) {
 
   const tabs = [
     { id: 'dashboard', label: 'Inicio', icon: Home, roles: ['admin', 'coach', 'player'] },
+    { id: 'session', label: 'Sesiones', icon: PlayCircle, roles: ['admin', 'coach'] },
     { id: 'players', label: 'Jugadores', icon: Users, roles: ['admin', 'coach'] },
     { id: 'performance', label: 'Rendimiento', icon: TrendingUp, roles: ['admin', 'coach'] },
     { id: 'calendar', label: 'Calendario', icon: CalendarDays, roles: ['admin', 'coach'] },

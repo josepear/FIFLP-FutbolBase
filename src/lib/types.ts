@@ -239,7 +239,7 @@ export const TEST_DEFINITIONS: Record<TestType, TestDefinition> = {
 export interface TestSession {
   id: string;
   club_id: string;
-  category_id: string; // deprecated, use team_id
+  category_id?: string; // deprecated, use team_id
   team_id?: string;
   coach_id: string;
   date: string;
@@ -270,7 +270,7 @@ export interface Player {
   last_name?: string;
   first_last_name?: string;
   second_last_name?: string;
-  category_id: string; // deprecated, use team_id
+  category_id?: string; // deprecated, use team_id
   team_id?: string;
   birth_date?: string;
   dni?: string;
