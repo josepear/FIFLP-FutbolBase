@@ -7,12 +7,18 @@ import { SessionPage } from './pages/SessionPage';
 import { PlayersPage } from './pages/PlayersPage';
 import { PerformancePage } from './pages/PerformancePage';
 import { CalendarPage } from './pages/CalendarPage';
+import { ReportsPage } from './pages/ReportsPage';
+import { SessionReportView } from './pages/SessionReportView';
 import { AdminPage } from './pages/AdminPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 function AppContent() {
   const { user, loading, blocked } = useAuth();
   const [currentTab, setCurrentTab] = useState(() => localStorage.getItem('ffb-tab') || 'dashboard');
+  const [publicSessionId, setPublicSessionId] = useState<string | null>(() => {
+    const h = window.location.hash.substring(1);
+    return h.startsWith('i/') ? h.replace('i/', '') : null;
+  });
 
   function navigate(tab: string) {
     setCurrentTab(tab);
@@ -24,6 +30,17 @@ function AppContent() {
     window.addEventListener('navigate', handler);
     return () => window.removeEventListener('navigate', handler);
   }, []);
+
+  useEffect(() => {
+    const handler = () => {
+      const h = window.location.hash.substring(1);
+      setPublicSessionId(h.startsWith('i/') ? h.replace('i/', '') : null);
+    };
+    window.addEventListener('hashchange', handler);
+    return () => window.removeEventListener('hashchange', handler);
+  }, []);
+
+  if (publicSessionId) return <SessionReportView sessionId={publicSessionId} />;
 
   if (loading) {
     return (
@@ -55,6 +72,7 @@ function AppContent() {
         {currentTab === 'players' && <PlayersPage />}
         {currentTab === 'performance' && <PerformancePage />}
         {currentTab === 'calendar' && <CalendarPage />}
+        {currentTab === 'reports' && <ReportsPage />}
         {currentTab === 'admin' && <AdminPage />}
       </ErrorBoundary>
     </Layout>

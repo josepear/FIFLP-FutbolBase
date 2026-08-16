@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { Home, PlayCircle, Users, TrendingUp, CalendarDays, Settings, LogOut } from 'lucide-react';
+import { Home, PlayCircle, Users, TrendingUp, CalendarDays, FileText, Settings, LogOut } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
@@ -17,6 +17,7 @@ export function Layout({ children, currentTab, onTabChange }: Props) {
     { id: 'players', label: 'Jugadores', icon: Users, roles: ['admin', 'coach'] },
     { id: 'performance', label: 'Rendimiento', icon: TrendingUp, roles: ['admin', 'coach'] },
     { id: 'calendar', label: 'Calendario', icon: CalendarDays, roles: ['admin', 'coach'] },
+    { id: 'reports', label: 'Informes', icon: FileText, roles: ['admin', 'coach'] },
     { id: 'admin', label: 'Admin', icon: Settings, roles: ['admin'] },
   ];
 
@@ -39,7 +40,7 @@ export function Layout({ children, currentTab, onTabChange }: Props) {
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border">
-        <div className="flex justify-around max-w-2xl mx-auto">
+        <div className="flex justify-around max-w-3xl mx-auto">
           {filtered.map(tab => {
             const active = currentTab === tab.id;
             return (
