@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { db, saveOffline } from '../lib/db';
-import { TEST_DEFINITIONS, type Team, type Category, type TestType } from '../lib/types';
+import { supabase } from '../lib/supabase';
+import { TEST_DEFINITIONS, type Team, type Category, type TestType, type Profile } from '../lib/types';
 import { generateId, sortByOrder } from '../lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { TestIcon } from '../components/TestIcon';
-import { Plus } from 'lucide-react';
+import { Plus, Power } from 'lucide-react';
 
 export function AdminPage() {
   const { profile } = useAuth();
@@ -20,6 +22,13 @@ export function AdminPage() {
   const [catFormato, setCatFormato] = useState<'f8' | 'f11'>('f8');
   const [objectives, setObjectives] = useState<Record<string, string>>({});
 
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [userEmail, setUserEmail] = useState('');
+  const [userPassword, setUserPassword] = useState('');
+  const [userName, setUserName] = useState('');
+  const [userRole, setUserRole] = useState<'coach' | 'player'>('coach');
+  const [userError, setUserError] = useState('');
+
   useEffect(() => {
     if (!profile?.club_id) return;
     db.teams.where('club_id').equals(profile.club_id).toArray().then(t => setTeams(sortByOrder(t)));
@@ -29,7 +38,13 @@ export function AdminPage() {
       for (const t of ts) if (!t.team_id) m[t.test_type] = String(t.target_value);
       setObjectives(m);
     });
+    loadProfiles();
   }, [profile?.club_id]);
+
+  async function loadProfiles() {
+    const { data } = await supabase.from('profiles').select('*').order('created_at');
+    setProfiles((data as Profile[]) || []);
+  }
 
   async function addTeam() {
     if (!profile?.club_id || !teamName.trim()) return;
@@ -83,9 +98,77 @@ export function AdminPage() {
     }
   }
 
+  async function addUser() {
+    if (!profile?.club_id || !userEmail.trim() || !userPassword || !userName.trim()) return;
+    setUserError('');
+    const { data, error } = await supabase.auth.signUp({
+      email: userEmail.trim(),
+      password: userPassword,
+      options: { data: { full_name: userName.trim(), role: userRole, club_id: profile.club_id } },
+    });
+    if (error) { setUserError(error.message); return; }
+    const userId = data.user?.id;
+    if (userRole === 'coach' && userId) {
+      await supabase.from('coach_permissions').insert({
+        profile_id: userId,
+        club_id: profile.club_id,
+        manage_players: true,
+        manage_sessions: true,
+        view_performance: true,
+        access_trash: false,
+        manage_teams: false,
+      });
+      await supabase.from('technical_staff').insert({
+        club_id: profile.club_id,
+        profile_id: userId,
+        full_name: userName.trim(),
+      });
+    }
+    setUserEmail('');
+    setUserPassword('');
+    setUserName('');
+    loadProfiles();
+  }
+
+  async function toggleActive(p: Profile) {
+    await supabase.from('profiles').update({ active: !p.active }).eq('id', p.id);
+    loadProfiles();
+  }
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-foreground">Administración</h1>
+
+      <Card>
+        <CardContent className="space-y-4 py-4">
+          <h2 className="font-semibold text-foreground">Usuarios</h2>
+          <div className="space-y-2">
+            {profiles.map(p => (
+              <div key={p.id} className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-foreground truncate">{p.full_name || p.email}</div>
+                  <div className="text-xs text-muted-foreground truncate">{p.email}</div>
+                </div>
+                <Badge variant="secondary">{p.role}</Badge>
+                <button onClick={() => toggleActive(p)} className={'p-1.5 rounded-md ' + (p.active === false ? 'text-muted-foreground' : 'text-green-500')} title={p.active === false ? 'Activar' : 'Desactivar'}>
+                  <Power size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <Input type="email" value={userEmail} onChange={e => setUserEmail(e.target.value)} placeholder="Email" />
+            <Input type="password" value={userPassword} onChange={e => setUserPassword(e.target.value)} placeholder="Contraseña (mín 6)" />
+            <Input value={userName} onChange={e => setUserName(e.target.value)} placeholder="Nombre completo" />
+            <select value={userRole} onChange={e => setUserRole(e.target.value as 'coach' | 'player')} className="p-2 rounded-md border border-border bg-card text-foreground">
+              <option value="coach">Entrenador</option>
+              <option value="player">Jugador</option>
+            </select>
+          </div>
+          {userError && <div className="text-sm text-red-400 bg-red-950 p-2">{userError}</div>}
+          <Button onClick={addUser} disabled={!userEmail.trim() || !userPassword || !userName.trim()} className="w-full"><Plus size={16} /> Añadir usuario</Button>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent className="space-y-4 py-4">
