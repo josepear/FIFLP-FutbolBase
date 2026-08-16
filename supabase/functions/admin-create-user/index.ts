@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const allowedOrigins = new Set([
   "http://localhost:5174",
+  "https://fiflp-futbolbase.pages.dev",
 ]);
 
 function corsHeaders(origin: string | null) {
