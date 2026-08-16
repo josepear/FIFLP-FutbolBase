@@ -5,6 +5,7 @@ import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { SessionPage } from './pages/SessionPage';
 import { PlayersPage } from './pages/PlayersPage';
+import { PerformancePage } from './pages/PerformancePage';
 import { AdminPage } from './pages/AdminPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -60,7 +61,7 @@ function AppContent() {
         {currentTab === 'dashboard' && <DashboardPage />}
         {currentTab === 'session' && <SessionPage />}
         {currentTab === 'players' && <PlayersPage />}
-        {currentTab === 'performance' && <Placeholder title="Rendimiento" />}
+        {currentTab === 'performance' && <PerformancePage />}
         {currentTab === 'calendar' && <Placeholder title="Calendario" />}
         {currentTab === 'admin' && <AdminPage />}
       </ErrorBoundary>
