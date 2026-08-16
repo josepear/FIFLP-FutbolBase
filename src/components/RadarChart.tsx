@@ -40,7 +40,12 @@ export function RadarChart({ axes, color = 'var(--primary)', size = 300 }: { axe
         return <line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="var(--border)" strokeWidth={1} />;
       })}
       <polygon points={valuePolygon} fill={color} fillOpacity={0.22} stroke={color} strokeWidth={2} />
-      {valuePoints.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={3.5} fill={color} />)}
+      {valuePoints.map((p, i) => (
+        <g key={i}>
+          <circle cx={p.x} cy={p.y} r={5} fill={color} />
+          <title>{axes[i].display}</title>
+        </g>
+      ))}
       {axes.map((ax, i) => {
         const p = point(i, radius + 20);
         return (

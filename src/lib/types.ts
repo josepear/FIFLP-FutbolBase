@@ -331,6 +331,7 @@ export interface SeasonMatch {
   id: string;
   club_id: string;
   team_id: string;
+  competition_id?: string;
   opponent: string;
   opponent_id?: string;
   date: string;
@@ -381,4 +382,15 @@ export interface PlayerStats {
   last_value: number;
   trend: 'up' | 'down' | 'stable';
   improvement_pct: number;
+}
+
+// Competición (liga / copa / torneo)
+export interface Competition {
+  id: string;
+  club_id: string;
+  name: string;
+  season?: string;
+  type?: 'liga' | 'copa' | 'torneo';
+  order?: number;
+  created_at?: string;
 }

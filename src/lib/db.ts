@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie';
-import type { TestSession, SessionTest, TestResult, Player, Category, Team, SeasonMatch, OpponentTeam, Video, TestTarget } from './types';
+import type { TestSession, SessionTest, TestResult, Player, Category, Team, SeasonMatch, OpponentTeam, Video, TestTarget, Competition } from './types';
 import { generateId } from './utils';
 
 export class FutbolBaseDB extends Dexie {
@@ -13,6 +13,7 @@ export class FutbolBaseDB extends Dexie {
   opponents!: Table<OpponentTeam, string>;
   videos!: Table<Video, string>;
   testTargets!: Table<TestTarget, string>;
+  competitions!: Table<Competition, string>;
   pendingSync!: Table<{ id: string; table: string; action: 'insert' | 'update' | 'delete'; data: any; created_at: string }, string>;
 
   constructor() {
@@ -30,13 +31,27 @@ export class FutbolBaseDB extends Dexie {
       testTargets: 'id, club_id, team_id, test_type',
       pendingSync: '++id, table, action',
     });
+    this.version(2).stores({
+      sessions: 'id, club_id, team_id, coach_id, date, status',
+      sessionTests: 'id, session_id, test_type',
+      testResults: 'id, session_id, session_test_id, player_id, test_type, synced, [session_test_id+player_id]',
+      players: 'id, club_id, team_id, full_name, first_name, last_name, phone, dni',
+      categories: 'id, club_id, name',
+      teams: 'id, club_id, category_id',
+      matches: 'id, club_id, team_id, date',
+      opponents: 'id, club_id, name',
+      videos: 'id, club_id, month',
+      testTargets: 'id, club_id, team_id, test_type',
+      competitions: 'id, club_id, name',
+      pendingSync: '++id, table, action',
+    });
   }
 }
 
 export const db = new FutbolBaseDB();
 
 export async function saveOffline<T extends { id: string }>(
-  table: keyof Pick<FutbolBaseDB, 'sessions' | 'sessionTests' | 'testResults' | 'players' | 'categories' | 'teams' | 'matches' | 'opponents' | 'videos' | 'testTargets'>,
+  table: keyof Pick<FutbolBaseDB, 'sessions' | 'sessionTests' | 'testResults' | 'players' | 'categories' | 'teams' | 'matches' | 'opponents' | 'videos' | 'testTargets' | 'competitions'>,
   data: T
 ) {
   if (table === 'categories') {
@@ -59,6 +74,8 @@ export async function saveOffline<T extends { id: string }>(
     await db.videos.put(data as unknown as Video);
   } else if (table === 'testTargets') {
     await db.testTargets.put(data as unknown as TestTarget);
+  } else if (table === 'competitions') {
+    await db.competitions.put(data as unknown as Competition);
   }
   await db.pendingSync.add({
     id: generateId(),
