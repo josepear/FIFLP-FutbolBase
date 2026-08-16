@@ -4,6 +4,8 @@ import { Layout } from './components/Layout';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { SessionPage } from './pages/SessionPage';
+import { PlayersPage } from './pages/PlayersPage';
+import { AdminPage } from './pages/AdminPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 function Placeholder({ title }: { title: string }) {
@@ -57,10 +59,10 @@ function AppContent() {
       <ErrorBoundary>
         {currentTab === 'dashboard' && <DashboardPage />}
         {currentTab === 'session' && <SessionPage />}
-        {currentTab === 'players' && <Placeholder title="Jugadores" />}
+        {currentTab === 'players' && <PlayersPage />}
         {currentTab === 'performance' && <Placeholder title="Rendimiento" />}
         {currentTab === 'calendar' && <Placeholder title="Calendario" />}
-        {currentTab === 'admin' && <Placeholder title="Administración" />}
+        {currentTab === 'admin' && <AdminPage />}
       </ErrorBoundary>
     </Layout>
   );
