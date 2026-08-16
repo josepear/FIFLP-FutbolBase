@@ -19,6 +19,35 @@ const DEFAULT_COACH_PERMS: CoachPermissions = {
   manage_teams: false,
 };
 
+// Debounce para el pull disparado por realtime: agrupa ráfagas de cambios
+// en una sola descarga (evita re-descargar todas las tablas por cada evento).
+let realtimePullTimer: ReturnType<typeof setTimeout> | null = null;
+function debouncedPull(clubId: string) {
+  if (realtimePullTimer) clearTimeout(realtimePullTimer);
+  realtimePullTimer = setTimeout(() => {
+    pullRemoteData(clubId).catch(() => {});
+  }, 2000);
+}
+
+let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
+
+function ensureRealtime(clubId: string) {
+  if (realtimeChannel) return; // ya suscrito (evita canales duplicados)
+  realtimeChannel = supabase.channel('db-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `club_id=eq.${clubId}` }, () => debouncedPull(clubId))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'teams', filter: `club_id=eq.${clubId}` }, () => debouncedPull(clubId))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'test_sessions', filter: `club_id=eq.${clubId}` }, () => debouncedPull(clubId))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'test_results' }, () => debouncedPull(clubId))
+    .subscribe();
+}
+
+function removeRealtime() {
+  if (realtimeChannel) {
+    realtimeChannel.unsubscribe().catch(() => {});
+    realtimeChannel = null;
+  }
+}
+
 interface AuthState {
   user: User | null;
   profile: Profile | null;
@@ -98,6 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (p?.active === false) {
         setBlocked(true);
         stopAutoSync();
+        removeRealtime();
         await supabase.auth.signOut();
         setProfile(null);
         setLoading(false);
@@ -160,12 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         startAutoSync(clubId);
 
         // Realtime: recibir cambios al instante
-        supabase.channel('db-changes')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `club_id=eq.${clubId}` }, () => pullRemoteData(clubId).catch(() => {}))
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'teams', filter: `club_id=eq.${clubId}` }, () => pullRemoteData(clubId).catch(() => {}))
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'test_sessions', filter: `club_id=eq.${clubId}` }, () => pullRemoteData(clubId).catch(() => {}))
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'test_results' }, () => pullRemoteData(clubId).catch(() => {}))
-          .subscribe();
+        ensureRealtime(clubId);
       }
     } catch (e) {
       // Fallback total: perfil cacheado
@@ -202,6 +227,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signOut() {
     stopAutoSync();
+    removeRealtime();
     await supabase.auth.signOut();
     setProfile(null);
     setPermissions(null);

@@ -218,11 +218,17 @@ export async function fullSync(clubId: string): Promise<{ pushed: number; pulled
   return { pushed, pulled: true };
 }
 
-// Auto-sync: siempre intenta sincronizar
-let autoSyncTimer: ReturnType<typeof setInterval> | null = null;
+// Auto-sync: separamos push (barato) de pull (caro en egress).
+// - push: sube lo pendiente con frecuencia (poco tráfico).
+// - pull: descarga todas las tablas con poca frecuencia (lo que gasta egress).
+let autoPullTimer: ReturnType<typeof setInterval> | null = null;
+let autoPushTimer: ReturnType<typeof setInterval> | null = null;
 
-export function startAutoSync(clubId: string, intervalMs = 30000) {
-  if (autoSyncTimer) return;
+const PUSH_INTERVAL_MS = 30000;   // 30 s: subir pendientes pronto
+const PULL_INTERVAL_MS = 600000;  // 10 min: descargar todo (ahorra egress)
+
+export function startAutoSync(clubId: string) {
+  if (autoPullTimer || autoPushTimer) return;
   // Limpiar registros pendingSync con IDs inválidos (legacy)
   db.pendingSync.filter(item => {
     const id = item.data?.id;
@@ -230,16 +236,21 @@ export function startAutoSync(clubId: string, intervalMs = 30000) {
   }).delete().catch(() => {});
   // Primera sincronización inmediata
   fullSync(clubId);
-  autoSyncTimer = setInterval(async () => {
-    console.log('[AutoSync] Sincronizando...');
+  autoPushTimer = setInterval(async () => {
     await pushPendingChanges();
+  }, PUSH_INTERVAL_MS);
+  autoPullTimer = setInterval(async () => {
     await pullRemoteData(clubId);
-  }, intervalMs);
+  }, PULL_INTERVAL_MS);
 }
 
 export function stopAutoSync() {
-  if (autoSyncTimer) {
-    clearInterval(autoSyncTimer);
-    autoSyncTimer = null;
+  if (autoPullTimer) {
+    clearInterval(autoPullTimer);
+    autoPullTimer = null;
+  }
+  if (autoPushTimer) {
+    clearInterval(autoPushTimer);
+    autoPushTimer = null;
   }
 }
