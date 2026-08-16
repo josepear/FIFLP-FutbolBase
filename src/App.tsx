@@ -6,17 +6,9 @@ import { DashboardPage } from './pages/DashboardPage';
 import { SessionPage } from './pages/SessionPage';
 import { PlayersPage } from './pages/PlayersPage';
 import { PerformancePage } from './pages/PerformancePage';
+import { CalendarPage } from './pages/CalendarPage';
 import { AdminPage } from './pages/AdminPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
-
-function Placeholder({ title }: { title: string }) {
-  return (
-    <div className="p-8 text-center">
-      <h2 className="text-xl font-bold text-foreground mb-2">{title}</h2>
-      <p className="text-muted-foreground">Sección en construcción.</p>
-    </div>
-  );
-}
 
 function AppContent() {
   const { user, loading, blocked } = useAuth();
@@ -62,7 +54,7 @@ function AppContent() {
         {currentTab === 'session' && <SessionPage />}
         {currentTab === 'players' && <PlayersPage />}
         {currentTab === 'performance' && <PerformancePage />}
-        {currentTab === 'calendar' && <Placeholder title="Calendario" />}
+        {currentTab === 'calendar' && <CalendarPage />}
         {currentTab === 'admin' && <AdminPage />}
       </ErrorBoundary>
     </Layout>
