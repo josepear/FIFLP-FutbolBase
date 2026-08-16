@@ -9,16 +9,25 @@ import { PerformancePage } from './pages/PerformancePage';
 import { CalendarPage } from './pages/CalendarPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { SessionReportView } from './pages/SessionReportView';
+import { PlayerPublicView } from './pages/PlayerPublicView';
+import { TeamPublicView } from './pages/TeamPublicView';
 import { AdminPage } from './pages/AdminPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
+
+type PublicView = { type: 'p' | 'e' | 'i'; id: string } | null;
+
+function parseHash(): PublicView {
+  const h = window.location.hash.substring(1);
+  if (h.startsWith('p/')) return { type: 'p', id: h.replace('p/', '') };
+  if (h.startsWith('e/')) return { type: 'e', id: h.replace('e/', '') };
+  if (h.startsWith('i/')) return { type: 'i', id: h.replace('i/', '') };
+  return null;
+}
 
 function AppContent() {
   const { user, loading, blocked } = useAuth();
   const [currentTab, setCurrentTab] = useState(() => localStorage.getItem('ffb-tab') || 'dashboard');
-  const [publicSessionId, setPublicSessionId] = useState<string | null>(() => {
-    const h = window.location.hash.substring(1);
-    return h.startsWith('i/') ? h.replace('i/', '') : null;
-  });
+  const [publicView, setPublicView] = useState<PublicView>(() => parseHash());
 
   function navigate(tab: string) {
     setCurrentTab(tab);
@@ -32,15 +41,16 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    const handler = () => {
-      const h = window.location.hash.substring(1);
-      setPublicSessionId(h.startsWith('i/') ? h.replace('i/', '') : null);
-    };
+    const handler = () => setPublicView(parseHash());
     window.addEventListener('hashchange', handler);
     return () => window.removeEventListener('hashchange', handler);
   }, []);
 
-  if (publicSessionId) return <SessionReportView sessionId={publicSessionId} />;
+  if (publicView) {
+    if (publicView.type === 'p') return <PlayerPublicView playerId={publicView.id} />;
+    if (publicView.type === 'e') return <TeamPublicView teamId={publicView.id} />;
+    return <SessionReportView sessionId={publicView.id} />;
+  }
 
   if (loading) {
     return (
