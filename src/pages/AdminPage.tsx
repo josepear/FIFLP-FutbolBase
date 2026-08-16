@@ -26,7 +26,7 @@ export function AdminPage() {
   const [userEmail, setUserEmail] = useState('');
   const [userPassword, setUserPassword] = useState('');
   const [userName, setUserName] = useState('');
-  const [userRole, setUserRole] = useState<'coach' | 'player'>('coach');
+  const [userRole, setUserRole] = useState<'admin' | 'coach' | 'player'>('coach');
   const [userError, setUserError] = useState('');
 
   useEffect(() => {
@@ -101,28 +101,15 @@ export function AdminPage() {
   async function addUser() {
     if (!profile?.club_id || !userEmail.trim() || !userPassword || !userName.trim()) return;
     setUserError('');
-    const { data, error } = await supabase.auth.signUp({
-      email: userEmail.trim(),
-      password: userPassword,
-      options: { data: { full_name: userName.trim(), role: userRole, club_id: profile.club_id } },
+    const { error } = await supabase.functions.invoke('admin-create-user', {
+      body: { email: userEmail.trim(), password: userPassword, fullName: userName.trim(), role: userRole },
     });
-    if (error) { setUserError(error.message); return; }
-    const userId = data.user?.id;
-    if (userRole === 'coach' && userId) {
-      await supabase.from('coach_permissions').insert({
-        profile_id: userId,
-        club_id: profile.club_id,
-        manage_players: true,
-        manage_sessions: true,
-        view_performance: true,
-        access_trash: false,
-        manage_teams: false,
-      });
-      await supabase.from('technical_staff').insert({
-        club_id: profile.club_id,
-        profile_id: userId,
-        full_name: userName.trim(),
-      });
+    if (error) {
+      try {
+        const ctx = await (error as any).context.json();
+        setUserError(ctx.error || error.message);
+      } catch { setUserError(error.message); }
+      return;
     }
     setUserEmail('');
     setUserPassword('');
@@ -160,9 +147,10 @@ export function AdminPage() {
             <Input type="email" value={userEmail} onChange={e => setUserEmail(e.target.value)} placeholder="Email" />
             <Input type="password" value={userPassword} onChange={e => setUserPassword(e.target.value)} placeholder="Contraseña (mín 6)" />
             <Input value={userName} onChange={e => setUserName(e.target.value)} placeholder="Nombre completo" />
-            <select value={userRole} onChange={e => setUserRole(e.target.value as 'coach' | 'player')} className="p-2 rounded-md border border-border bg-card text-foreground">
+            <select value={userRole} onChange={e => setUserRole(e.target.value as 'admin' | 'coach' | 'player')} className="p-2 rounded-md border border-border bg-card text-foreground">
               <option value="coach">Entrenador</option>
               <option value="player">Jugador</option>
+              <option value="admin">Administrador</option>
             </select>
           </div>
           {userError && <div className="text-sm text-red-400 bg-red-950 p-2">{userError}</div>}
