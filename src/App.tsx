@@ -1,18 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { Layout } from './components/Layout';
 import { LoginPage } from './pages/LoginPage';
-import { DashboardPage } from './pages/DashboardPage';
-import { SessionPage } from './pages/SessionPage';
-import { PlayersPage } from './pages/PlayersPage';
-import { PerformancePage } from './pages/PerformancePage';
-import { CalendarPage } from './pages/CalendarPage';
-import { ReportsPage } from './pages/ReportsPage';
-import { SessionReportView } from './pages/SessionReportView';
-import { PlayerPublicView } from './pages/PlayerPublicView';
-import { TeamPublicView } from './pages/TeamPublicView';
-import { AdminPage } from './pages/AdminPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
+
+const DashboardPage = lazy(() => import('./pages/DashboardPage').then(m => ({ default: m.DashboardPage })));
+const SessionPage = lazy(() => import('./pages/SessionPage').then(m => ({ default: m.SessionPage })));
+const PlayersPage = lazy(() => import('./pages/PlayersPage').then(m => ({ default: m.PlayersPage })));
+const PerformancePage = lazy(() => import('./pages/PerformancePage').then(m => ({ default: m.PerformancePage })));
+const CalendarPage = lazy(() => import('./pages/CalendarPage').then(m => ({ default: m.CalendarPage })));
+const ReportsPage = lazy(() => import('./pages/ReportsPage').then(m => ({ default: m.ReportsPage })));
+const SessionReportView = lazy(() => import('./pages/SessionReportView').then(m => ({ default: m.SessionReportView })));
+const PlayerPublicView = lazy(() => import('./pages/PlayerPublicView').then(m => ({ default: m.PlayerPublicView })));
+const TeamPublicView = lazy(() => import('./pages/TeamPublicView').then(m => ({ default: m.TeamPublicView })));
+const AdminPage = lazy(() => import('./pages/AdminPage').then(m => ({ default: m.AdminPage })));
 
 type PublicView = { type: 'p' | 'e' | 'i'; id: string } | null;
 
@@ -23,6 +24,10 @@ function parseHash(): PublicView {
   if (h.startsWith('i/')) return { type: 'i', id: h.replace('i/', '') };
   return null;
 }
+
+const Loading = () => (
+  <div className="p-8 text-center text-muted-foreground">Cargando…</div>
+);
 
 function AppContent() {
   const { user, loading, blocked } = useAuth();
@@ -47,9 +52,11 @@ function AppContent() {
   }, []);
 
   if (publicView) {
-    if (publicView.type === 'p') return <PlayerPublicView playerId={publicView.id} />;
-    if (publicView.type === 'e') return <TeamPublicView teamId={publicView.id} />;
-    return <SessionReportView sessionId={publicView.id} />;
+    return (
+      <Suspense fallback={<Loading />}>
+        {publicView.type === 'p' ? <PlayerPublicView playerId={publicView.id} /> : publicView.type === 'e' ? <TeamPublicView teamId={publicView.id} /> : <SessionReportView sessionId={publicView.id} />}
+      </Suspense>
+    );
   }
 
   if (loading) {
@@ -76,15 +83,17 @@ function AppContent() {
 
   return (
     <Layout currentTab={currentTab} onTabChange={navigate}>
-      <ErrorBoundary>
-        {currentTab === 'dashboard' && <DashboardPage />}
-        {currentTab === 'session' && <SessionPage />}
-        {currentTab === 'players' && <PlayersPage />}
-        {currentTab === 'performance' && <PerformancePage />}
-        {currentTab === 'calendar' && <CalendarPage />}
-        {currentTab === 'reports' && <ReportsPage />}
-        {currentTab === 'admin' && <AdminPage />}
-      </ErrorBoundary>
+      <Suspense fallback={<Loading />}>
+        <ErrorBoundary>
+          {currentTab === 'dashboard' && <DashboardPage />}
+          {currentTab === 'session' && <SessionPage />}
+          {currentTab === 'players' && <PlayersPage />}
+          {currentTab === 'performance' && <PerformancePage />}
+          {currentTab === 'calendar' && <CalendarPage />}
+          {currentTab === 'reports' && <ReportsPage />}
+          {currentTab === 'admin' && <AdminPage />}
+        </ErrorBoundary>
+      </Suspense>
     </Layout>
   );
 }
