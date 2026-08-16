@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { TestIcon } from '../components/TestIcon';
+import { LiveTestView } from '../components/LiveTestView';
 import { Plus } from 'lucide-react';
 
 export function SessionPage() {
@@ -19,6 +20,7 @@ export function SessionPage() {
   const [teamId, setTeamId] = useState('');
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [selectedTests, setSelectedTests] = useState<TestType[]>([]);
+  const [openSession, setOpenSession] = useState<TestSession | null>(null);
 
   useEffect(() => {
     if (!profile?.club_id) return;
@@ -56,6 +58,10 @@ export function SessionPage() {
 
   function toggleTest(t: TestType) {
     setSelectedTests(prev => (prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]));
+  }
+
+  if (openSession) {
+    return <LiveTestView session={openSession} onClose={() => setOpenSession(null)} />;
   }
 
   return (
@@ -115,7 +121,7 @@ export function SessionPage() {
         {sessions.map(s => {
           const team = teams.find(t => t.id === s.team_id);
           return (
-            <Card key={s.id}>
+            <Card key={s.id} className="cursor-pointer hover:bg-secondary/50 transition-colors" onClick={() => setOpenSession(s)}>
               <CardContent className="py-3 flex items-center justify-between">
                 <div>
                   <div className="font-semibold text-foreground">{s.date}</div>
