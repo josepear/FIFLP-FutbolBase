@@ -1,25 +1,39 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { db, saveOffline } from '../lib/db';
-import type { SeasonMatch, Team, Competition } from '../lib/types';
-import { generateId, sortByOrder } from '../lib/utils';
+import type { SeasonMatch, Team, Competition, Player, MatchEvent, MatchEventType } from '../lib/types';
+import { generateId, sortByOrder, playerListLabel } from '../lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Plus } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp } from 'lucide-react';
 
 function fmtDate(iso: string): string {
   return iso.split('-').reverse().join('/');
 }
+
+const EVENT_LABELS: Record<MatchEventType, { label: string; icon: string }> = {
+  gol: { label: 'Gol', icon: '⚽' },
+  asistencia: { label: 'Asistencia', icon: '🎯' },
+  tarjeta_amarilla: { label: 'Tarjeta amarilla', icon: '🟨' },
+  tarjeta_roja: { label: 'Tarjeta roja', icon: '🟥' },
+  cambio_entra: { label: 'Entra (cambio)', icon: '⬆️' },
+  cambio_sale: { label: 'Sale (cambio)', icon: '⬇️' },
+};
+
+const EVENT_ORDER: MatchEventType[] = ['gol', 'asistencia', 'tarjeta_amarilla', 'tarjeta_roja', 'cambio_entra', 'cambio_sale'];
 
 export function CalendarPage() {
   const { profile } = useAuth();
   const [matches, setMatches] = useState<SeasonMatch[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [competitions, setCompetitions] = useState<Competition[]>([]);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [matchEvents, setMatchEvents] = useState<MatchEvent[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
   const [teamId, setTeamId] = useState('');
   const [opponent, setOpponent] = useState('');
   const [competitionId, setCompetitionId] = useState('');
@@ -32,11 +46,18 @@ export function CalendarPage() {
   const [compName, setCompName] = useState('');
   const [compType, setCompType] = useState<'liga' | 'copa' | 'torneo'>('liga');
 
+  // Formulario de evento
+  const [eventType, setEventType] = useState<MatchEventType>('gol');
+  const [eventPlayerId, setEventPlayerId] = useState('');
+  const [eventMinute, setEventMinute] = useState('');
+
   useEffect(() => {
     if (!profile?.club_id) return;
     db.matches.where('club_id').equals(profile.club_id).toArray().then(m => setMatches([...m].sort((a, b) => a.date.localeCompare(b.date))));
     db.teams.where('club_id').equals(profile.club_id).toArray().then(t => setTeams(sortByOrder(t)));
     db.competitions.where('club_id').equals(profile.club_id).toArray().then(c => setCompetitions(sortByOrder(c)));
+    db.players.where('club_id').equals(profile.club_id).toArray().then(p => setPlayers([...p].sort((a, b) => playerListLabel(a).localeCompare(playerListLabel(b)))));
+    db.matchEvents.where('club_id').equals(profile.club_id).toArray().then(ev => setMatchEvents(ev));
   }, [profile?.club_id]);
 
   async function addMatch() {
@@ -81,6 +102,23 @@ export function CalendarPage() {
     });
     setCompName('');
     db.competitions.where('club_id').equals(profile.club_id).toArray().then(c => setCompetitions(sortByOrder(c)));
+  }
+
+  async function addMatchEvent(matchId: string) {
+    if (!profile?.club_id || !eventType) return;
+    await saveOffline('matchEvents', {
+      id: generateId(),
+      club_id: profile.club_id,
+      match_id: matchId,
+      player_id: eventPlayerId || undefined,
+      event_type: eventType,
+      minute: eventMinute !== '' ? Number(eventMinute) : undefined,
+      created_at: new Date().toISOString(),
+    });
+    setEventType('gol');
+    setEventPlayerId('');
+    setEventMinute('');
+    db.matchEvents.where('club_id').equals(profile.club_id).toArray().then(ev => setMatchEvents(ev));
   }
 
   return (
@@ -166,23 +204,78 @@ export function CalendarPage() {
         {matches.map(m => {
           const team = teams.find(t => t.id === m.team_id);
           const comp = competitions.find(c => c.id === m.competition_id);
+          const isExpanded = expandedMatchId === m.id;
+          const events = matchEvents.filter(e => e.match_id === m.id).sort((a, b) => (a.minute ?? 0) - (b.minute ?? 0));
           return (
             <Card key={m.id}>
-              <CardContent className="py-3 flex items-center gap-3">
-                <div className="w-14 shrink-0 text-center">
-                  <div className="text-xs text-muted-foreground">{fmtDate(m.date).slice(0, 5)}</div>
-                  <div className="text-xs text-muted-foreground">{m.time || ''}</div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-foreground truncate">
-                    {m.is_home ? team?.name || 'Equipo' : m.opponent} vs {m.is_home ? m.opponent : team?.name || 'Equipo'}
+              <CardContent className="py-3">
+                <button
+                  type="button"
+                  className="w-full flex items-center gap-3 text-left"
+                  onClick={() => setExpandedMatchId(isExpanded ? null : m.id)}
+                >
+                  <div className="w-14 shrink-0 text-center">
+                    <div className="text-xs text-muted-foreground">{fmtDate(m.date).slice(0, 5)}</div>
+                    <div className="text-xs text-muted-foreground">{m.time || ''}</div>
                   </div>
-                  <div className="text-sm text-muted-foreground truncate">{comp?.name || m.venue || ''}</div>
-                </div>
-                {m.status === 'played' ? (
-                  <div className="font-bold text-foreground tabular-nums">{m.local_score ?? 0} - {m.away_score ?? 0}</div>
-                ) : (
-                  <Badge variant="secondary">Programado</Badge>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-foreground truncate">
+                      {m.is_home ? team?.name || 'Equipo' : m.opponent} vs {m.is_home ? m.opponent : team?.name || 'Equipo'}
+                    </div>
+                    <div className="text-sm text-muted-foreground truncate">{comp?.name || m.venue || ''}</div>
+                  </div>
+                  {m.status === 'played' ? (
+                    <div className="font-bold text-foreground tabular-nums">{m.local_score ?? 0} - {m.away_score ?? 0}</div>
+                  ) : (
+                    <Badge variant="secondary">Programado</Badge>
+                  )}
+                  {isExpanded ? <ChevronUp size={16} className="shrink-0 text-muted-foreground" /> : <ChevronDown size={16} className="shrink-0 text-muted-foreground" />}
+                </button>
+
+                {isExpanded && (
+                  <div className="mt-3 space-y-3 border-t border-border pt-3">
+                    <h3 className="text-sm font-semibold text-foreground">Eventos del partido</h3>
+
+                    {events.length === 0 && (
+                      <p className="text-sm text-muted-foreground">Sin eventos registrados todavía.</p>
+                    )}
+
+                    {events.map(ev => {
+                      const meta = EVENT_LABELS[ev.event_type];
+                      const player = players.find(p => p.id === ev.player_id);
+                      return (
+                        <div key={ev.id} className="flex items-center gap-2 text-sm">
+                          <span>{meta.icon}</span>
+                          <span className="font-medium text-foreground">{meta.label}</span>
+                          {ev.minute !== undefined && <span className="text-muted-foreground tabular-nums">{ev.minute}'</span>}
+                          {player && <span className="text-muted-foreground">— {playerListLabel(player)}</span>}
+                        </div>
+                      );
+                    })}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div>
+                        <Label>Tipo</Label>
+                        <select value={eventType} onChange={e => setEventType(e.target.value as MatchEventType)} className="w-full mt-1 p-2 rounded-md border border-border bg-card text-foreground">
+                          {EVENT_ORDER.map(t => <option key={t} value={t}>{EVENT_LABELS[t].label}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <Label>Jugador</Label>
+                        <select value={eventPlayerId} onChange={e => setEventPlayerId(e.target.value)} className="w-full mt-1 p-2 rounded-md border border-border bg-card text-foreground">
+                          <option value="">Sin jugador</option>
+                          {players.map(p => <option key={p.id} value={p.id}>{playerListLabel(p)}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <Label>Minuto</Label>
+                        <Input type="number" value={eventMinute} onChange={e => setEventMinute(e.target.value)} placeholder="Ej. 23" />
+                      </div>
+                    </div>
+                    <Button onClick={() => addMatchEvent(m.id)} disabled={!eventType} size="sm" variant="outline" className="w-full">
+                      <Plus size={16} /> Añadir evento
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>

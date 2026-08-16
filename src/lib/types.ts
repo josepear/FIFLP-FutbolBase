@@ -394,3 +394,23 @@ export interface Competition {
   order?: number;
   created_at?: string;
 }
+
+// Eventos de partido (goles, asistencias, tarjetas, cambios)
+export type MatchEventType =
+  | 'gol'
+  | 'asistencia'
+  | 'tarjeta_amarilla'
+  | 'tarjeta_roja'
+  | 'cambio_entra'
+  | 'cambio_sale';
+
+export interface MatchEvent {
+  id: string;
+  club_id: string;
+  match_id: string;
+  player_id?: string;
+  event_type: MatchEventType;
+  minute?: number;
+  notes?: string;
+  created_at: string;
+}

@@ -5,9 +5,9 @@
 
 import { supabase } from './supabase';
 import { db, type FutbolBaseDB } from './db';
-import type { TestResult, TestSession, SessionTest, Player, Category, Team, SeasonMatch, OpponentTeam, Video, TestTarget, Competition } from './types';
+import type { TestResult, TestSession, SessionTest, Player, Category, Team, SeasonMatch, OpponentTeam, Video, TestTarget, Competition, MatchEvent } from './types';
 
-type SyncableTable = keyof Pick<FutbolBaseDB, 'sessions' | 'sessionTests' | 'testResults' | 'players' | 'categories' | 'teams' | 'matches' | 'opponents' | 'videos' | 'testTargets' | 'competitions'>;
+type SyncableTable = keyof Pick<FutbolBaseDB, 'sessions' | 'sessionTests' | 'testResults' | 'players' | 'categories' | 'teams' | 'matches' | 'opponents' | 'videos' | 'testTargets' | 'competitions' | 'matchEvents'>;
 
 const TABLE_MAP: Record<SyncableTable, string> = {
   sessions: 'test_sessions',
@@ -21,6 +21,7 @@ const TABLE_MAP: Record<SyncableTable, string> = {
   videos: 'videos',
   testTargets: 'test_targets',
   competitions: 'competitions',
+  matchEvents: 'match_events',
 };
 
 // Descarga TODAS las filas de una tabla con filtro .in(), paginando
@@ -127,7 +128,7 @@ export async function pullRemoteData(clubId: string): Promise<void> {
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
-    const [categoriesRes, playersRes, sessionsRes, teamsRes, matchesRes, opponentsRes, videosRes, testTargetsRes, competitionsRes] = await Promise.all([
+    const [categoriesRes, playersRes, sessionsRes, teamsRes, matchesRes, opponentsRes, videosRes, testTargetsRes, competitionsRes, matchEventsRes] = await Promise.all([
       supabase.from('categories').select('*').eq('club_id', clubId),
       supabase.from('players').select('*').eq('club_id', clubId).is('deleted_at', null),
       supabase.from('test_sessions').select('*').eq('club_id', clubId).gte('date', oneYearAgo.toISOString().split('T')[0]),
@@ -137,6 +138,7 @@ export async function pullRemoteData(clubId: string): Promise<void> {
       supabase.from('videos').select('*').eq('club_id', clubId).is('deleted_at', null),
       supabase.from('test_targets').select('*').eq('club_id', clubId),
       supabase.from('competitions').select('*').eq('club_id', clubId),
+      supabase.from('match_events').select('*').eq('club_id', clubId),
     ]);
 
     // Log individual para diagnóstico (qué tabla falla y con qué código)
@@ -149,6 +151,7 @@ export async function pullRemoteData(clubId: string): Promise<void> {
     if (videosRes.error) console.error('[Pull] videos:', videosRes.error.message, videosRes.error.code);
     if (testTargetsRes.error) console.error('[Pull] test_targets:', testTargetsRes.error.message, testTargetsRes.error.code);
     if (competitionsRes.error) console.error('[Pull] competitions:', competitionsRes.error.message, competitionsRes.error.code);
+    if (matchEventsRes.error) console.error('[Pull] match_events:', matchEventsRes.error.message, matchEventsRes.error.code);
 
     // Guardar cada tabla solo si llegó bien (no borramos la local si falló)
     if (!categoriesRes.error) {
@@ -186,6 +189,10 @@ export async function pullRemoteData(clubId: string): Promise<void> {
     if (!competitionsRes.error) {
       await db.competitions.clear();
       await db.competitions.bulkPut((competitionsRes.data || []) as Competition[]);
+    }
+    if (!matchEventsRes.error) {
+      await db.matchEvents.clear();
+      await db.matchEvents.bulkPut((matchEventsRes.data || []) as MatchEvent[]);
     }
 
     // session_tests y test_results dependen de sessions; solo si sessions llegó bien

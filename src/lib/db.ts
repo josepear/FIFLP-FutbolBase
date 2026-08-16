@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie';
-import type { TestSession, SessionTest, TestResult, Player, Category, Team, SeasonMatch, OpponentTeam, Video, TestTarget, Competition } from './types';
+import type { TestSession, SessionTest, TestResult, Player, Category, Team, SeasonMatch, OpponentTeam, Video, TestTarget, Competition, MatchEvent } from './types';
 import { generateId } from './utils';
 
 export class FutbolBaseDB extends Dexie {
@@ -14,6 +14,7 @@ export class FutbolBaseDB extends Dexie {
   videos!: Table<Video, string>;
   testTargets!: Table<TestTarget, string>;
   competitions!: Table<Competition, string>;
+  matchEvents!: Table<MatchEvent, string>;
   pendingSync!: Table<{ id: string; table: string; action: 'insert' | 'update' | 'delete'; data: any; created_at: string }, string>;
 
   constructor() {
@@ -29,6 +30,7 @@ export class FutbolBaseDB extends Dexie {
       opponents: 'id, club_id, name',
       videos: 'id, club_id, month',
       testTargets: 'id, club_id, team_id, test_type',
+      matchEvents: 'id, club_id, match_id, player_id, event_type',
       pendingSync: '++id, table, action',
     });
     this.version(2).stores({
@@ -43,6 +45,22 @@ export class FutbolBaseDB extends Dexie {
       videos: 'id, club_id, month',
       testTargets: 'id, club_id, team_id, test_type',
       competitions: 'id, club_id, name',
+      matchEvents: 'id, club_id, match_id, player_id, event_type',
+      pendingSync: '++id, table, action',
+    });
+    this.version(3).stores({
+      sessions: 'id, club_id, team_id, coach_id, date, status',
+      sessionTests: 'id, session_id, test_type',
+      testResults: 'id, session_id, session_test_id, player_id, test_type, synced, [session_test_id+player_id]',
+      players: 'id, club_id, team_id, full_name, first_name, last_name, phone, dni',
+      categories: 'id, club_id, name',
+      teams: 'id, club_id, category_id',
+      matches: 'id, club_id, team_id, date',
+      opponents: 'id, club_id, name',
+      videos: 'id, club_id, month',
+      testTargets: 'id, club_id, team_id, test_type',
+      competitions: 'id, club_id, name',
+      matchEvents: 'id, club_id, match_id, player_id, event_type',
       pendingSync: '++id, table, action',
     });
   }
@@ -51,7 +69,7 @@ export class FutbolBaseDB extends Dexie {
 export const db = new FutbolBaseDB();
 
 export async function saveOffline<T extends { id: string }>(
-  table: keyof Pick<FutbolBaseDB, 'sessions' | 'sessionTests' | 'testResults' | 'players' | 'categories' | 'teams' | 'matches' | 'opponents' | 'videos' | 'testTargets' | 'competitions'>,
+  table: keyof Pick<FutbolBaseDB, 'sessions' | 'sessionTests' | 'testResults' | 'players' | 'categories' | 'teams' | 'matches' | 'opponents' | 'videos' | 'testTargets' | 'competitions' | 'matchEvents'>,
   data: T
 ) {
   if (table === 'categories') {
@@ -76,6 +94,8 @@ export async function saveOffline<T extends { id: string }>(
     await db.testTargets.put(data as unknown as TestTarget);
   } else if (table === 'competitions') {
     await db.competitions.put(data as unknown as Competition);
+  } else if (table === 'matchEvents') {
+    await db.matchEvents.put(data as unknown as MatchEvent);
   }
   await db.pendingSync.add({
     id: generateId(),
